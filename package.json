@@ -1,0 +1,18 @@
+{
+  "name": "worm-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "fake": "node fake.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "really-simple-http-server": "^1.2.0",
+    "ws": "^7.2.3"
+  }
+}
