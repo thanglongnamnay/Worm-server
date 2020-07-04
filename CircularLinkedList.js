@@ -98,20 +98,44 @@ module.exports = function CircularLinkedList() {
     };
 
     function forEach(iter) {
+        if (!head) return;
         let current = head;
-        const temp = head
-
         let index = 0;
-        while(current && temp !== current.next){
+        do {
         	iter(current, index);
             current = current.next;
             ++index;
-        }
+        } while(index < length);
+    }
+
+    function includes(item) {
+        if (!head) return;
+        let current = head;
+        let index = 0;
+        do {
+            if (item === current) return true;
+            ++index;
+        } while(index < length);
+        return false;
+    }
+
+    function filter(predicate) {
+        const ret = [];
+        if (!head) return ret;
+        let current = head;
+        let index = 0;
+        do {
+            console.log('pred:', predicate(current, index));
+            if (predicate(current, index)) ret.push(current);
+            current = current.next;
+            ++index;
+        } while(index < length);
+        return ret;
     }
     
     function isPresent(elm) {
         return indexOf(elm) !== -1;
-    };
+    }
     
     function getHead() {
         return head;
@@ -125,7 +149,21 @@ module.exports = function CircularLinkedList() {
         current.next = node.next;
         --length;
         return node;
-    }; 
+    }
+
+    function removeIf(predicate) {
+        if (!head) return;
+        let current = head;
+        while(head !== current.next) {
+            if (predicate(current.next)) {
+                current.next = current.next.next;
+                --length;
+            } else {
+                current = current.next;
+            }
+        }
+        return head;
+    }
     
     function removeHead() {
         removeAt(0);
@@ -180,6 +218,10 @@ module.exports = function CircularLinkedList() {
 		get length() { return length; },
 		push,
 		remove,
+        forEach,
+        filter,
+        includes,
+        removeIf,
 		toString,
 		toArray,
 		// removeHead,
