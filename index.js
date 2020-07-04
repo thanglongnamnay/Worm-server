@@ -80,7 +80,7 @@ const Player = function(ws) {
 			mp = 0;
 		},
 		leave() {
-			RoomMgr.remove(this);
+			RoomMgr.removePlayer(this);
 			console.log("Players:" , players);	
 		},
 		sync({params}) {
@@ -93,6 +93,7 @@ const Player = function(ws) {
 			console.log("sync:", this.toString());
 		},
 		toString() {
+			const name = this.name;
 			return JSON.stringify({
 				id: _id,
 				name,
@@ -121,7 +122,7 @@ const NextTurn = player => OutPacket({
 });
 const EndGame = player => OutPacket({
 	cmd: CMD.END_GAME,
-	params: [player.id],
+	params: [player ? player.id : -1],
 });
 const Sync = () => OutPacket({
 	cmd: CMD.SYNC_PLAYER,
@@ -185,9 +186,10 @@ const RoomMgr = (function() {
 				this.broadCast(Start(players.head))
 			},
 			nextTurn() {
-				if (players.filter(p => p.hp > 0).length <= 1) {
+				const alivePlayers = players.filter(p => p.hp > 0);
+				if (alivePlayers.length <= 1) {
 					RoomMgr.removeRoom(this);
-					return this.broadCast(EndGame(currentPlayer));
+					return this.broadCast(EndGame(alivePlayers[0]));
 				}
 				players.forEach(p => console.log("p:", p.toString()));
 				const lastPlayer = currentPlayer;
@@ -210,7 +212,7 @@ const RoomMgr = (function() {
 			availableRoom.add(player);
 			console.log('room:', rooms.map(r => r.players.length));
 		},
-		remove(player) {
+		removePlayer(player) {
 			const room = player.room;
 			if (room) {
 				if (!room.players.length) rooms = rooms.filter(r => r !== room);
@@ -218,7 +220,7 @@ const RoomMgr = (function() {
 			}
 		},
 		removeRoom(room) {
-			players = players.filter(p => !room.players.includes(p));
+			players = players.filter(p => p.room !== room);
 			rooms = rooms.filter(r => r !== room);
 			console.log('room:', rooms.map(r => r.players.length));
 		},
@@ -231,7 +233,7 @@ wss.on('connection', function connection(ws) {
 
 	ws.on('close', function(e) {
 		player.leave();
-		players = players.filter(p => p !== this);
+		players = players.filter(p => p !== player);
 	});
     ws.on('message', function incoming(raw) {
         console.log('received: %s', raw);
