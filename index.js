@@ -80,8 +80,9 @@ const Player = function(ws) {
 			mp = 0;
 		},
 		leave() {
+			hp = 0;
 			RoomMgr.removePlayer(this);
-			console.log("Players:" , players);	
+			console.log("Players:" , players.map(p=>p.toString()));
 		},
 		sync({params}) {
 			params.getNumber();
@@ -112,13 +113,9 @@ const Start = player => OutPacket({
 	cmd: CMD.START,
 	params: [player.id],
 });
-const YourId = player => OutPacket({
+const YourId = (player, master = false) => OutPacket({
 	cmd: CMD.YOUR_ID,
-	params: [player.id],
-});
-const NextTurn = player => OutPacket({
-	cmd: CMD.NEXT_TURN,
-	params: [player.id],
+	params: [player.id, +master],
 });
 const EndGame = player => OutPacket({
 	cmd: CMD.END_GAME,
@@ -155,6 +152,7 @@ const RoomMgr = (function() {
 		return {
 			get seed() { return seed; },
 			get players() { return players; },
+			get alivePlayers() { return players.filter(p => p.hp > 0); },
 			get currentPlayer() { return currentPlayer; },
 			get lastTimeWait() { return lastTimeWait; },
 			add(player) {
@@ -167,7 +165,7 @@ const RoomMgr = (function() {
 				this.broadCast(JoinRoom(seed, player));
 
 				if (players.length >= MAX_PLAYER_PER_ROOM) {
-					players.forEach(player => player.ws.send(YourId(player)));
+					players.forEach((player, index) => player.ws.send(YourId(player, index === 0)));
 					setTimeout(this.startGame.bind(this), 200);
 				}
 			},
@@ -185,20 +183,6 @@ const RoomMgr = (function() {
 				currentPlayer = players.head;
 				this.broadCast(Start(players.head))
 			},
-			nextTurn() {
-				const alivePlayers = players.filter(p => p.hp > 0);
-				if (alivePlayers.length <= 1) {
-					RoomMgr.removeRoom(this);
-					return this.broadCast(EndGame(alivePlayers[0]));
-				}
-				players.forEach(p => console.log("p:", p.toString()));
-				const lastPlayer = currentPlayer;
-				do {
-					currentPlayer = currentPlayer.next;
-				} while (currentPlayer.hp <= 0 && currentPlayer !== lastPlayer);
-				if (currentPlayer === lastPlayer) throw Error("WTF?");
-				this.broadCast(NextTurn(currentPlayer));
-			},
 		}
 	}
 
@@ -215,7 +199,7 @@ const RoomMgr = (function() {
 		removePlayer(player) {
 			const room = player.room;
 			if (room) {
-				if (!room.players.length) rooms = rooms.filter(r => r !== room);
+				if (!room.alivePlayers.length) rooms = rooms.filter(r => r !== room);
 				console.log('room:', rooms.map(r => r.players.length));
 			}
 		},
@@ -234,6 +218,7 @@ wss.on('connection', function connection(ws) {
 	ws.on('close', function(e) {
 		player.leave();
 		players = players.filter(p => p !== player);
+		console.log("Players:", players.map(p=>p.toString()));
 	});
     ws.on('message', function incoming(raw) {
         console.log('received: %s', raw);
@@ -255,9 +240,6 @@ wss.on('connection', function connection(ws) {
     			break;
     		case CMD.GAME_ACTION:
     			player.room.broadCast(raw);
-    			break;
-    		case CMD.NEXT_TURN:
-    			player.room.nextTurn();
     			break;
     		case CMD.SYNC_PLAYER:
     			player.sync(message);

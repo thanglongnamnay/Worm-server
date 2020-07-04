@@ -125,7 +125,6 @@ module.exports = function CircularLinkedList() {
         let current = head;
         let index = 0;
         do {
-            console.log('pred:', predicate(current, index));
             if (predicate(current, index)) ret.push(current);
             current = current.next;
             ++index;
