@@ -1,6 +1,6 @@
 require('dotenv').config();
 const WebSocket = require('ws');
-const RandomAnimalName = require('random-animal-name')
+const RandomName = require('random-animal-name');
 const CircularLinkedList = require('./CircularLinkedList.js');
 
 const wss = new WebSocket.Server({ port: 8000 });
@@ -227,7 +227,7 @@ wss.on('connection', function connection(ws) {
         const message = Message(player, raw);
         switch (message.cmd) {
         	case CMD.LOGIN:
-        		player.name = message.params.getString() || RandomAnimalName();
+        		player.name = message.params.getString() || RandomName();
 				console.log("Players:" , players.map(p=>p.toString()));
         		player.ws.send(OutPacket({
         			cmd: CMD.LOGIN,
