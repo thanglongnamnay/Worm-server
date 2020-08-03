@@ -3,8 +3,6 @@ const WebSocket = require('ws');
 const RandomName = require('random-animal-name');
 const CircularLinkedList = require('./CircularLinkedList.js');
 
-const wss = new WebSocket.Server({ port: 8000 });
-
 const { DEBUG } = process.env;
 
 const rand = Math.random.bind(Math);
@@ -62,7 +60,7 @@ const throwError = function(s) {
 
 const Player = function(ws) {
 	let room = null;
-	let _id = ++id, name = (rand() * 10000).toString(36), x = 0, y = 0, hp = 0, mp = 0, angle = 10;
+	let _id = ++id, name = RandomName(), x = 0, y = 0, hp = 0, mp = 0, angle = 10;
 	return {
 		get id() { return _id; },
 		name,
@@ -78,12 +76,12 @@ const Player = function(ws) {
 			x = 600 + rand() * 600 >> 0;
 			y = 400 + rand() * 400 >> 0;
 			hp = 100;
-			mp = 0;
+			mp = 100;
 		},
 		leave() {
 			hp = 0;
 			RoomMgr.removePlayer(this);
-			console.log("Players:" , players.map(p=>p.toString()));
+			console.log("Players left:" , players.map(p=>p.toString()));
 		},
 		sync({params}) {
 			params.getNumber();
@@ -93,6 +91,7 @@ const Player = function(ws) {
 			mp = params.getNumber();
 			angle = params.getNumber();
 			console.log("sync:", this.toString());
+			if (hp <= 0) this.leave();
 		},
 		toString() {
 			const name = this.name;
@@ -126,6 +125,10 @@ const Sync = () => OutPacket({
 	cmd: CMD.SYNC_PLAYER,
 	params: [],
 });
+const Leave = (player) => OutPacket({
+	cmd: CMD.LEAVE_ROOM,
+	params: [player.id],
+})
 
 const RoomMgr = (function() {
 	let rooms = [];
@@ -146,7 +149,7 @@ const RoomMgr = (function() {
 
 	function Room() {
 		const seed = rand() * (1 << 16) >> 0;
-		let players = CircularLinkedList();
+		let players = [];
 		let lastTimeWait = Date.now();
 		let currentPlayer = null;
 		let waitForSync = false;
@@ -171,7 +174,8 @@ const RoomMgr = (function() {
 				}
 			},
 			remove(player) {
-				players.remove(player);
+				players = players.filter(p => p !== player);
+				this.broadCast(Leave(player));
 			},
 			broadCast(message, except) {
 				console.log("broadCast:", message);
@@ -181,8 +185,8 @@ const RoomMgr = (function() {
 				});
 			},
 			startGame() {
-				currentPlayer = players.head;
-				this.broadCast(Start(players.head))
+				currentPlayer = players[0];
+				this.broadCast(Start(players[0]))
 			},
 		}
 	}
@@ -200,6 +204,7 @@ const RoomMgr = (function() {
 		removePlayer(player) {
 			const room = player.room;
 			if (room) {
+				room.remove(player);
 				if (!room.alivePlayers.length) rooms = rooms.filter(r => r !== room);
 				console.log('room:', rooms.map(r => r.players.length));
 			}
@@ -211,6 +216,11 @@ const RoomMgr = (function() {
 		},
 	}
 })();
+
+const wss = new WebSocket.Server({
+	host: '0.0.0.0',
+	port: 8000,
+});
 
 wss.on('connection', function connection(ws) {
 	const player = Player(ws);
@@ -237,7 +247,7 @@ wss.on('connection', function connection(ws) {
     			RoomMgr.queue(player);
     			break;
     		case CMD.LEAVE_ROOM:
-    			player.leave();
+    			setTimeout(() => player.leave(), 500);
     			break;
     		case CMD.GAME_ACTION:
     			player.room.broadCast(raw);
